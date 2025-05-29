@@ -1,17 +1,19 @@
 /js/app.js
-import { AiGateway } from "./aiGateway.js";
-import { loadScenarios, getScenarioByName } from "./scenarioManager.js";
+import { AiGateway }                         from "./aiGateway.js";
+import { loadScenarios, getScenarioByName }  from "./scenarioManager.js";
+import { speak, stop as stopTTS }            from "./ttsBrowser.js";
+import { md }                                from "./md.js";
 
 const $ = id => document.getElementById(id);
 
 /* ───── Runtime State ───── */
 let uiLang = "ru";
 let settings = JSON.parse(localStorage.getItem("appSettings") || "{}");
-let gateway = new AiGateway(settings.apiKey || "", "openai/o3");
+let gateway  = new AiGateway(settings.apiKey || "", "openai/o3");
 let scenarios = [];
 let currentScenario = null;
 let storyChunks = [];   // [{author,text}]
-let lastPrompt = "";    // хранит текущий benutzerPrompt
+let lastPrompt  = "";   // хранит текущий benutzerPrompt
 
 /* ───── I18N ───── */
 let dict = {};
@@ -33,19 +35,20 @@ function applyI18n(){
 
 /* ───── Settings modal ───── */
 $("btnSettings").onclick = () => {
-  $("uiLang").value   = uiLang;
-  $("apiKey").value   = settings.apiKey || "";
-  $("storyMode").value= settings.storyMode || "text";
-  $("scenarioSel").value = currentScenario?.name || "";
+  $("uiLang").value     = uiLang;
+  $("apiKey").value     = settings.apiKey || "";
+  $("storyMode").value  = settings.storyMode || "text";
+  $("scenarioSel").value= currentScenario?.name || "";
   $("settingsModal").showModal();
 };
 $("closeSettings").onclick = () => $("settingsModal").close();
 $("saveSettings").onclick  = () => {
-  uiLang            = $("uiLang").value;
-  settings.apiKey   = $("apiKey").value.trim();
-  settings.storyMode= $("storyMode").value;
-  settings.scenario = $("scenarioSel").value;
-  currentScenario   = getScenarioByName(scenarios, settings.scenario);
+  uiLang              = $("uiLang").value;
+  settings.apiKey     = $("apiKey").value.trim();
+  settings.storyMode  = $("storyMode").value;
+  settings.scenario   = $("scenarioSel").value;
+  settings.readSummary= $("readSummary")?.checked || false;        // optionales TTS-Flag
+  currentScenario     = getScenarioByName(scenarios, settings.scenario);
   localStorage.setItem("appSettings", JSON.stringify(settings));
   gateway.setKey(settings.apiKey);
   $("settingsModal").close();
@@ -54,8 +57,9 @@ $("saveSettings").onclick  = () => {
 
 /* ───── Rendering helpers ───── */
 function renderStory(){
-  $("storyView").innerHTML = storyChunks.map(c =>
-    `<p><strong>${c.author}:</strong> ${c.text}</p>`).join("");
+  $("storyView").innerHTML = storyChunks
+    .map(c => `<p><strong>${c.author}:</strong> ${md(c.text)}</p>`)
+    .join("");
   $("storyView").scrollTop = $("storyView").scrollHeight;
 }
 function showOptions(arr){
@@ -67,20 +71,20 @@ function showOptions(arr){
 
 /* ───── Game Flow ───── */
 $("btnStart").onclick = async () => {
-  if(!settings.apiKey) return alert(_("toastNoKey"));
-  if(!currentScenario) return alert("Сценарии не загружены");
+  if(!settings.apiKey)   return alert(_("toastNoKey"));
+  if(!currentScenario)   return alert("Сценарии не загружены");
 
   $("btnStart").disabled = true;
-  storyChunks.length = 0;                      // reset
+  storyChunks.length = 0;
 
   /* P1 */
-  const resP1 = await gateway.completion(currentScenario.prompts.p1, 60, 0.8);
+  const resP1 = await gateway.completion(currentScenario.prompts.p1, 60, .8);
   storyChunks.push({author:"ai", text: resP1.text.trim()});
   renderStory();
 
   /* P2 */
   const p2 = currentScenario.prompts.p2.replace("{storyTail}", resP1.text.trim());
-  const resP2 = await gateway.completion(p2, 60, 0.7);
+  const resP2 = await gateway.completion(p2, 60, .7);
   lastPrompt = resP2.text.trim();
   $("promptText").textContent = lastPrompt;
 
@@ -88,7 +92,7 @@ $("btnStart").onclick = async () => {
   const p3 = currentScenario.prompts.p3
              .replace("{storyTail}", resP1.text.trim())
              .replace("{benutzerPrompt}", lastPrompt);
-  let resP3 = await gateway.completion(p3, 120, 0.7);
+  let resP3 = await gateway.completion(p3, 120, .7);
   let opts;
   try { opts = JSON.parse(resP3.text); } catch { opts = ["Вариант 1","Вариант 2","Вариант 3"]; }
   showOptions(opts);
@@ -110,33 +114,40 @@ $("sendInput").onclick = async () => {
             .replace("{fullStory}", fullStory)
             .replace("{selectedAnswer}", userText)
             .replace("{userName}", "You");
-  const resP4 = await gateway.completion(p4, 150, 0.7);
+  const resP4 = await gateway.completion(p4, 150, .7);
   storyChunks.push({author:"ai", text: resP4.text.trim()});
   renderStory();
 
-  /* P5 */
-  const p5 = currentScenario.prompts.p5.replace("{selectedAnswer}", userText).replace("{userName}", "You");
-  const resP5 = await gateway.completion(p5, 40, 0.8);
-  $("commentBox").textContent = resP5.text.trim();
+  /* P5 – Kommentar + optional vorlesen */
+  const p5 = currentScenario.prompts.p5
+            .replace("{selectedAnswer}", userText)
+            .replace("{userName}", "You");
+  const resP5 = await gateway.completion(p5, 40, .8);
+  $("commentBox").innerHTML = md(resP5.text.trim());
+  if(settings.readSummary) {
+    stopTTS();
+    speak(resP5.text.trim(), uiLang === "de" ? "de-DE" : "ru-RU")
+      .catch(()=>console.warn("TTS failed"));
+  }
 
-  /* P2/P3 for next turn with new tail */
+  /* P2/P3 für nächste Runde */
   const tail = storyChunks.slice(-2).map(c=>c.text).join(" ");
   const newP2 = currentScenario.prompts.p2.replace("{storyTail}", tail);
-  const resNewP2 = await gateway.completion(newP2, 60, 0.7);
+  const resNewP2 = await gateway.completion(newP2, 60, .7);
   lastPrompt = resNewP2.text.trim();
   $("promptText").textContent = lastPrompt;
 
   const newP3 = currentScenario.prompts.p3
                 .replace("{storyTail}", tail)
                 .replace("{benutzerPrompt}", lastPrompt);
-  let resNewP3 = await gateway.completion(newP3, 120, 0.7);
+  let resNewP3 = await gateway.completion(newP3, 120, .7);
   let opts2;
-  try { opts2 = JSON.parse(resNewP3.text); } catch { opts2=["A","B","C"]; }
+  try { opts2 = JSON.parse(resNewP3.text); } catch { opts2 = ["A","B","C"]; }
   showOptions(opts2);
 };
 
 $("btnRestart").onclick = () => location.reload();
-$("btnStop").onclick    = () => { $("btnStart").disabled=false; $("btnStop").disabled=true; };
+$("btnStop").onclick    = () => { $("btnStart").disabled=false; $("btnStop").disabled=true; stopTTS(); };
 
 window.addEventListener("load", applyI18n);
 /js/app.js end
