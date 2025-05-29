@@ -1,97 +1,142 @@
-
+/js/app.js
 import { AiGateway } from "./aiGateway.js";
+import { loadScenarios, getScenarioByName } from "./scenarioManager.js";
 
-const el = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 
-/* ───── State ───── */
+/* ───── Runtime State ───── */
 let uiLang = "ru";
 let settings = JSON.parse(localStorage.getItem("appSettings") || "{}");
-let gateway = new AiGateway(settings.apiKey || "", settings.model || "openai/o3");
-let storyChunks = [];  // массив объектов {author,text}
+let gateway = new AiGateway(settings.apiKey || "", "openai/o3");
+let scenarios = [];
+let currentScenario = null;
+let storyChunks = [];   // [{author,text}]
+let lastPrompt = "";    // хранит текущий benutzerPrompt
 
 /* ───── I18N ───── */
-let i18nDict = {};
-fetch("assets/i18n.json")
-  .then(r => r.json())
-  .then(json => { i18nDict = json; applyI18n(); });
-
-function _(key) { return i18nDict[key]?.[uiLang] || key; }
-function applyI18n() {
-  document.querySelectorAll("[data-i18n]").forEach(elm => {
-    elm.textContent = _(elm.dataset.i18n);
-  });
-  el("btnStart").textContent   = _("btnStart");
-  el("btnRestart").textContent = _("btnRestart");
-  el("btnStop").textContent    = _("btnStop");
-  el("btnSettings").textContent= _("btnSettings");
-  el("btnLog").textContent     = _("btnLog");
+let dict = {};
+fetch("assets/i18n.json").then(r => r.json()).then(j => { dict = j; applyI18n(); });
+function _(k){ return dict[k]?.[uiLang] || k; }
+function applyI18n(){
+  document.querySelectorAll("[data-i18n]").forEach(e => e.textContent = _(e.dataset.i18n));
+  ["btnStart","btnRestart","btnStop","btnSettings","btnLog"].forEach(id => $(id).textContent = _(id));
 }
 
-/* ───── Toolbar Events ───── */
-el("btnSettings").onclick = () => {
-  el("uiLang").value = uiLang;
-  el("apiKey").value = settings.apiKey || "";
-  el("storyMode").value = settings.storyMode || "text";
-  el("settingsModal").showModal();
+/* ───── Load scenarios & fill <select> ───── */
+(async () => {
+  scenarios = await loadScenarios();
+  const sel = $("scenarioSel");
+  sel.innerHTML = scenarios.map(s => `<option>${s.name}</option>`).join("");
+  sel.value = settings.scenario || scenarios[0].name;
+  currentScenario = getScenarioByName(scenarios, sel.value);
+})();
+
+/* ───── Settings modal ───── */
+$("btnSettings").onclick = () => {
+  $("uiLang").value   = uiLang;
+  $("apiKey").value   = settings.apiKey || "";
+  $("storyMode").value= settings.storyMode || "text";
+  $("scenarioSel").value = currentScenario?.name || "";
+  $("settingsModal").showModal();
 };
-el("closeSettings").onclick = () => el("settingsModal").close();
-el("saveSettings").onclick  = () => {
-  settings.apiKey = el("apiKey").value.trim();
-  settings.storyMode = el("storyMode").value;
-  uiLang = el("uiLang").value;
+$("closeSettings").onclick = () => $("settingsModal").close();
+$("saveSettings").onclick  = () => {
+  uiLang            = $("uiLang").value;
+  settings.apiKey   = $("apiKey").value.trim();
+  settings.storyMode= $("storyMode").value;
+  settings.scenario = $("scenarioSel").value;
+  currentScenario   = getScenarioByName(scenarios, settings.scenario);
   localStorage.setItem("appSettings", JSON.stringify(settings));
   gateway.setKey(settings.apiKey);
-  el("settingsModal").close();
+  $("settingsModal").close();
   applyI18n();
 };
 
-/* ───── Story rendering ───── */
-function renderStory() {
-  el("storyView").innerHTML = storyChunks
-    .map(ch => `<p><strong>${ch.author}:</strong> ${ch.text}</p>`)
-    .join("");
-  el("storyView").scrollTop = el("storyView").scrollHeight;
+/* ───── Rendering helpers ───── */
+function renderStory(){
+  $("storyView").innerHTML = storyChunks.map(c =>
+    `<p><strong>${c.author}:</strong> ${c.text}</p>`).join("");
+  $("storyView").scrollTop = $("storyView").scrollHeight;
+}
+function showOptions(arr){
+  $("optionList").innerHTML = arr.map(txt =>
+    `<button class="opt">${txt}</button>`).join("");
+  document.querySelectorAll(".opt").forEach(btn =>
+    btn.onclick = () => { $("lastInput").value = btn.textContent; });
 }
 
-/* ───── Start logic ───── */
-el("btnStart").onclick = async () => {
-  if (!settings.apiKey) return alert(_("toastNoKey"));
-  el("btnStart").disabled = true;
-  // P1 Initial Prompt (stub)
-  const p1 = "Начни короткую историю одним предложением.";
-  const res = await gateway.completion(p1, 60, 0.8);
-  storyChunks.push({ author: "ai", text: res.text.trim() });
+/* ───── Game Flow ───── */
+$("btnStart").onclick = async () => {
+  if(!settings.apiKey) return alert(_("toastNoKey"));
+  if(!currentScenario) return alert("Сценарии не загружены");
+
+  $("btnStart").disabled = true;
+  storyChunks.length = 0;                      // reset
+
+  /* P1 */
+  const resP1 = await gateway.completion(currentScenario.prompts.p1, 60, 0.8);
+  storyChunks.push({author:"ai", text: resP1.text.trim()});
   renderStory();
-  // показать Prompt & Options (заглушки)
-  el("promptText").textContent = "Что будет дальше?";
-  el("optionList").innerHTML = ["Вариант A", "Вариант B", "Вариант C"]
-    .map(txt => `<button class="opt">${txt}</button>`).join("");
-  // enable input
-  document.querySelectorAll(".opt").forEach(btn => {
-    btn.onclick = () => { el("lastInput").value = btn.textContent; };
-  });
-  el("freeAnswer").style.display = "block";
-  el("btnRestart").disabled = false;
-  el("btnStop").disabled = false;
+
+  /* P2 */
+  const p2 = currentScenario.prompts.p2.replace("{storyTail}", resP1.text.trim());
+  const resP2 = await gateway.completion(p2, 60, 0.7);
+  lastPrompt = resP2.text.trim();
+  $("promptText").textContent = lastPrompt;
+
+  /* P3 */
+  const p3 = currentScenario.prompts.p3
+             .replace("{storyTail}", resP1.text.trim())
+             .replace("{benutzerPrompt}", lastPrompt);
+  let resP3 = await gateway.completion(p3, 120, 0.7);
+  let opts;
+  try { opts = JSON.parse(resP3.text); } catch { opts = ["Вариант 1","Вариант 2","Вариант 3"]; }
+  showOptions(opts);
+
+  $("btnRestart").disabled = false;
+  $("btnStop").disabled    = false;
 };
 
-el("sendInput").onclick = async () => {
-  const userText = el("lastInput").value.trim();
-  if (!userText) return;
-  storyChunks.push({ author: "you", text: userText });
+$("sendInput").onclick = async () => {
+  const userText = $("lastInput").value.trim();
+  if(!userText) return;
+  $("lastInput").value = "";
+  storyChunks.push({author:"you", text:userText});
   renderStory();
-  el("lastInput").value = "";
-  // P4 Integration Prompt (sehr vereinfacht)
-  const p4 = `Продолжи историю: ${storyChunks.slice(-2).map(c=>c.text).join(" ")}.`;
-  const res = await gateway.completion(p4, 120, 0.7);
-  storyChunks.push({ author: "ai", text: res.text.trim() });
+
+  /* P4 */
+  const fullStory = storyChunks.map(c=>c.text).join(" ");
+  const p4 = currentScenario.prompts.p4
+            .replace("{fullStory}", fullStory)
+            .replace("{selectedAnswer}", userText)
+            .replace("{userName}", "You");
+  const resP4 = await gateway.completion(p4, 150, 0.7);
+  storyChunks.push({author:"ai", text: resP4.text.trim()});
   renderStory();
+
+  /* P5 */
+  const p5 = currentScenario.prompts.p5.replace("{selectedAnswer}", userText).replace("{userName}", "You");
+  const resP5 = await gateway.completion(p5, 40, 0.8);
+  $("commentBox").textContent = resP5.text.trim();
+
+  /* P2/P3 for next turn with new tail */
+  const tail = storyChunks.slice(-2).map(c=>c.text).join(" ");
+  const newP2 = currentScenario.prompts.p2.replace("{storyTail}", tail);
+  const resNewP2 = await gateway.completion(newP2, 60, 0.7);
+  lastPrompt = resNewP2.text.trim();
+  $("promptText").textContent = lastPrompt;
+
+  const newP3 = currentScenario.prompts.p3
+                .replace("{storyTail}", tail)
+                .replace("{benutzerPrompt}", lastPrompt);
+  let resNewP3 = await gateway.completion(newP3, 120, 0.7);
+  let opts2;
+  try { opts2 = JSON.parse(resNewP3.text); } catch { opts2=["A","B","C"]; }
+  showOptions(opts2);
 };
 
-el("btnRestart").onclick = () => location.reload();
-el("btnStop").onclick = () => {
-  el("btnStart").disabled = false;
-  el("btnRestart").disabled = true;
-  el("btnStop").disabled = true;
-};
+$("btnRestart").onclick = () => location.reload();
+$("btnStop").onclick    = () => { $("btnStart").disabled=false; $("btnStop").disabled=true; };
+
 window.addEventListener("load", applyI18n);
+/js/app.js end
