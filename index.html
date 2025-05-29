@@ -1,4 +1,4 @@
-/index.html
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -28,7 +28,7 @@
 
   <!-- ───── Main Layout ───── -->
   <main id="layout">
-    <!-- Left column: User input & comment -->
+    <!-- Left column -->
     <div id="inputColumn">
       <h3 data-i18n="lblLastInput">Последний вклад</h3>
       <textarea id="lastInput" rows="4" placeholder="Пишите или запишите голосом…"></textarea>
@@ -38,32 +38,35 @@
       <div id="commentBox" class="scroll"></div>
     </div>
 
-    <!-- Right column: Story -->
+    <!-- Right column -->
     <div id="storyColumn">
       <h3 data-i18n="lblStory">Текущая история</h3>
       <div id="storyView" class="scroll"></div>
     </div>
   </main>
 
-  <!-- ───── Prompt & Options (appear at bottom) ───── -->
+  <!-- ───── Prompt & Options ───── -->
   <section id="promptSection">
     <h3 data-i18n="lblPrompt">Вопрос</h3>
     <p id="promptText"></p>
-
     <div id="optionList"></div>
-
     <textarea id="freeAnswer" rows="3" placeholder="Опиши свой вариант…"></textarea>
   </section>
 
-  <!-- ───── Settings Modal (hidden template) ───── -->
+  <!-- ───── Settings Modal ───── -->
   <dialog id="settingsModal">
     <h2>Settings</h2>
+
     <label>Language
       <select id="uiLang">
         <option value="ru">Русский</option>
         <option value="en">English</option>
         <option value="de">Deutsch</option>
       </select>
+    </label>
+
+    <label>Scenario
+      <select id="scenarioSel"></select>
     </label>
 
     <label>OpenRouter API-Key
@@ -84,4 +87,3 @@
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
-/index.html end
