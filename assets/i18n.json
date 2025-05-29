@@ -1,0 +1,15 @@
+/assets/i18n.json
+{
+  "btnStart":   { "ru": "Старт",       "en": "Start",       "de": "Start"        },
+  "btnRestart": { "ru": "Перезапуск",  "en": "Restart",     "de": "Neustart"     },
+  "btnStop":    { "ru": "Стоп",        "en": "Stop",        "de": "Stopp"        },
+  "btnSettings":{ "ru": "Настройки",   "en": "Settings",    "de": "Einstellungen"},
+  "btnLog":     { "ru": "Лог",         "en": "Log",         "de": "Log"          },
+  "lblLastInput":{ "ru": "Последний вклад", "en": "Last Input", "de": "Letzter Beitrag"},
+  "lblStory":   { "ru": "Текущая история", "en": "Current Story", "de": "Aktuelle Geschichte"},
+  "lblPrompt":  { "ru": "Вопрос",      "en": "Prompt",      "de": "Frage"        },
+  "lblOptions": { "ru": "Варианты",    "en": "Options",     "de": "Optionen"     },
+  "lblComment": { "ru": "Комментарий", "en": "Comment",     "de": "Kommentar"    },
+  "toastNoKey": { "ru": "Укажите API-ключ OpenRouter", "en": "Please enter OpenRouter API key", "de": "Bitte OpenRouter-API-Schlüssel eingeben" }
+}
+/assets/i18n.json end
