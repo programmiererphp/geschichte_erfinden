@@ -1,0 +1,26 @@
+
+/* Basic reset & layout */
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui, sans-serif}
+body{display:flex;flex-direction:column;height:100vh}
+header#toolbar{background:#202020;color:#fff;padding:.5rem;display:flex;gap:.5rem}
+header#toolbar button{padding:.3rem .8rem;border:0;border-radius:4px;cursor:pointer}
+header#toolbar button:disabled{opacity:.35;cursor:default}
+
+#statusBar{font-size:.8rem;padding:.3rem .5rem;background:#f2f2f2}
+#statusBar span{margin-right:.5rem}
+
+main#layout{flex:1;display:flex;gap:1rem;padding:1rem;overflow:hidden}
+#inputColumn, #storyColumn{flex:1;display:flex;flex-direction:column}
+h3{margin-bottom:.4rem;font-size:1rem}
+textarea{width:100%;resize:vertical;padding:.5rem}
+#storyView, #commentBox{flex:1;border:1px solid #ddd;padding:.5rem;background:#fafafa;overflow:auto}
+
+section#promptSection{padding:1rem;border-top:1px solid #ddd;background:#fafafa}
+#optionList{display:flex;gap:.5rem;margin:.5rem 0}
+#optionList img{width:80px;height:80px;object-fit:cover;border:1px solid #ccc;border-radius:4px;cursor:pointer}
+#optionList img.disabled{opacity:.4;cursor:default}
+
+@media(max-width:576px){
+  main#layout{flex-direction:column}
+  #storyColumn{order:-1}
+}
