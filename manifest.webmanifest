@@ -1,0 +1,45 @@
+
+{
+  "name": "Story Invent",
+  "short_name": "StoryInvent",
+  "description": "Interaktive Web-App zum gemeinsamen Geschichtenerfinden mit KI-Unterstützung.",
+  "id": "/",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#202020",
+  "background_color": "#fafafa",
+
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  
+  "shortcuts": [
+    {
+      "name": "Neues Solo-Story",
+      "short_name": "Solo",
+      "description": "Starte sofort das Szenario Story Solo.",
+      "url": "/index.html?scenario=Story%20Solo",
+      "icons": [{ "src": "icons/solo.png", "sizes": "96x96", "type": "image/png" }]
+    },
+    {
+      "name": "Duo-Modus",
+      "short_name": "Duo",
+      "description": "Sofort gemeinsam schreiben.",
+      "url": "/index.html?scenario=Story%20Duo",
+      "icons": [{ "src": "icons/duo.png", "sizes": "96x96", "type": "image/png" }]
+    }
+  ]
+}
