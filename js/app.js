@@ -1,4 +1,4 @@
-/js/app.js
+
 import { AiGateway }                         from "./aiGateway.js";
 import { loadScenarios, getScenarioByName }  from "./scenarioManager.js";
 import { speak, stop as stopTTS }            from "./ttsBrowser.js";
@@ -150,4 +150,3 @@ $("btnRestart").onclick = () => location.reload();
 $("btnStop").onclick    = () => { $("btnStart").disabled=false; $("btnStop").disabled=true; stopTTS(); };
 
 window.addEventListener("load", applyI18n);
-/js/app.js end
